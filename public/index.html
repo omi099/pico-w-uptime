@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pico W Status</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background-color: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; margin-top: 0; }
+        .status-card { padding: 15px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+        .ready { background-color: #ddffdd; color: #006600; }
+        .offline { background-color: #ffdddd; color: #660000; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .info-item { background-color: #f9f9f9; padding: 10px; border-radius: 5px; }
+        .info-item h3 { margin-top: 0; color: #555; }
+        .memory-bar { height: 20px; background-color: #e0e0e0; border-radius: 10px; margin-top: 5px; overflow: hidden; }
+        .memory-used { height: 100%; background-color: #4CAF50; }
+        footer { text-align: center; margin-top: 20px; color: #777; font-size: 0.8em; }
+        #connectionStatus { text-align: center; margin-bottom: 10px; font-size: 0.9em; color: #777; }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Pico W Status Monitor</h1>
+        <div id="connectionStatus">Connecting...</div>
+        
+        <div id="statusCard" class="status-card offline">
+            <h2>Status: Offline</h2>
+            <p id="statusMessage">Waiting for device to connect</p>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <h3>Device Information</h3>
+                <p><strong>Device:</strong> <span id="deviceType">-</span></p>
+                <p><strong>ID:</strong> <span id="deviceId">-</span></p>
+            </div>
+            
+            <div class="info-item">
+                <h3>Uptime</h3>
+                <p id="uptime">-</p>
+                <p id="startTime">-</p>
+            </div>
+            
+            <div class="info-item">
+                <h3>Memory</h3>
+                <p id="memoryInfo">-</p>
+                <div class="memory-bar">
+                    <div id="memoryUsed" class="memory-used" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="info-item">
+                <h3>Last Update</h3>
+                <p id="lastUpdate">Never</p>
+            </div>
+        </div>
+        
+        <footer>
+            Real-time status monitoring via Socket.IO
+        </footer>
+    </div>
+    
+    <script>
+        // Connect to Socket.IO server
+        const socket = io();
+        
+        // Elements
+        const connectionStatus = document.getElementById('connectionStatus');
+        const statusCard = document.getElementById('statusCard');
+        const statusMessage = document.getElementById('statusMessage');
+        const deviceType = document.getElementById('deviceType');
+        const deviceId = document.getElementById('deviceId');
+        const uptime = document.getElementById('uptime');
+        const startTime = document.getElementById('startTime');
+        const memoryInfo = document.getElementById('memoryInfo');
+        const memoryUsed = document.getElementById('memoryUsed');
+        const lastUpdate = document.getElementById('lastUpdate');
+        
+        // Socket.IO event handlers
+        socket.on('connect', () => {
+            connectionStatus.textContent = 'Connected to server';
+        });
+        
+        socket.on('disconnect', () => {
+            connectionStatus.textContent = 'Disconnected from server';
+        });
+        
+        socket.on('status_update', (data) => {
+            console.log('Received status update:', data);
+            
+            // Update status card
+            statusCard.className = 'status-card ' + data.status;
+            statusMessage.textContent = data.status === 'ready' ? 
+                'Device is online and functioning normally' : 
+                'Device is not currently connected';
+            
+            // Update device info
+            if (data.deviceInfo) {
+                deviceType.textContent = data.deviceInfo.device || '-';
+                deviceId.textContent = data.deviceInfo.device_id || '-';
+                uptime.textContent = data.deviceInfo.uptime_formatted || '-';
+                
+                // Calculate start time
+                if (data.deviceInfo.uptime) {
+                    const startDate = new Date(Date.now() - (data.deviceInfo.uptime * 1000));
+                    startTime.textContent = 'Started: ' + startDate.toLocaleString();
+                }
+                
+                // Update memory info
+                if (data.deviceInfo.memory) {
+                    const memory = data.deviceInfo.memory;
+                    memoryInfo.textContent = `Free: ${memory.free} bytes (${memory.percent_free}%)`;
+                    memoryUsed.style.width = (100 - memory.percent_free) + '%';
+                }
+            }
+            
+            // Update last update time
+            if (data.lastUpdate) {
+                const updateDate = new Date(data.lastUpdate);
+                lastUpdate.textContent = updateDate.toLocaleString();
+            }
+        });
+    </script>
+</body>
+</html>
